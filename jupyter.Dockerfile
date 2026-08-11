@@ -1,8 +1,3 @@
-#
-# NOTE: THIS DOCKERFILE IS GENERATED VIA "apply-templates.sh"
-#
-# PLEASE DO NOT EDIT IT DIRECTLY.
-#
 
 FROM buildpack-deps:bookworm
 
@@ -141,51 +136,17 @@ RUN set -eux; \
 ARG SPARK_VERSION=4.1.2
 
 # Set environment variables for Spark and Hadoop
-ENV SPARK_HOME="/opt/spark"
-ENV HADOOP_HOME="/opt/hadoop"
 # Set JAVA_HOME
 ENV JAVA_HOME="/usr/lib/jvm/java-17-openjdk-amd64"
 ENV PATH=$JAVA_HOME/bin:$PATH
 
-# Create necessary directories for Spark and Hadoop
-RUN mkdir -p ${HADOOP_HOME} && mkdir -p ${SPARK_HOME}
-WORKDIR ${SPARK_HOME}
-
-
-RUN curl https://dlcdn.apache.org/spark/spark-${SPARK_VERSION}/spark-${SPARK_VERSION}-bin-hadoop3.tgz -o spark-${SPARK_VERSION}-bin-hadoop3.tgz \
- && tar xvzf spark-${SPARK_VERSION}-bin-hadoop3.tgz --directory /opt/spark --strip-components 1 \
- && rm -rf spark-${SPARK_VERSION}-bin-hadoop3.tgz  # Remove the archive to save space
-
 # Install required Python dependencies
 COPY requirements.txt .
 RUN pip3 install -r requirements.txt
-
-# Add Spark paths to the environment variables
-ENV PATH="/opt/spark/sbin:/opt/spark/bin:${PATH}"
-ENV SPARK_HOME="/opt/spark"
-ENV SPARK_MASTER="spark://spark-master:7077"
-ENV SPARK_MASTER_HOST=spark-master
-ENV SPARK_MASTER_PORT=7077
-ENV PYSPARK_PYTHON=python3
-ENV PYSPARK_DRIVER_PYTHON=jupyter
-ENV PYSPARK_DRIVER_PYTHON_OPTS="notebook"
-ENV SPARK_WORKLOAD="master"
-
-# Copy Spark configuration file
-COPY spark-defaults.conf ${SPARK_HOME}/conf/
-
+# Add custom Jupyter config
+RUN mkdir -p /opt/spark/apps
+RUN mkdir -p /opt/spark/spark-events
 # Grant execution permissions to Spark scripts
-RUN chmod u+x /opt/spark/sbin/* && \
-    chmod u+x /opt/spark/bin/*
-
-# Add PySpark to PYTHONPATH to allow Spark module imports in Python
-ENV PYTHONPATH=$SPARK_HOME/python/:$PYTHONPATH
-
-# Copy the entrypoint script that will start the required services
-COPY entrypoint.sh /
-
-# Make the script executable
-# RUN chmod +x entrypoint.sh
-
-# Set the entrypoint
-CMD ["/bin/bash", "/entrypoint.sh"]
+EXPOSE 8888	
+WORKDIR /opt/spark/apps
+CMD jupyter lab --ip=0.0.0.0 --port=8888 --no-browser --allow-root --NotebookApp.token=tanvianuj
